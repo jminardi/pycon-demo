@@ -43,48 +43,103 @@ N_INPUTS = 6
 N_OUTPUTS = 3
 
 
-class Box(Component):
+class ConnectionsComponent(Component):
+
+    # List of lines to draw
     lines = List()
+
+    b = Int(30)
+
+    r = Int(15)
 
     bgcolor = (0.9294, 0.9294, 0.9294)
 
     def draw(self, gc, **kwargs):
-        super(Box, self).draw(gc, **kwargs)
+        super(ConnectionsComponent, self).draw(gc, **kwargs)
         with gc:
             self._draw_endpoints(gc)
             self._draw_lines(gc)
-            gc.stroke_path()
         return
 
     def _draw_endpoints(self, gc):
-        w, h = gc.width(), gc.height()
-        gc.set_line_width(2.0)
-        gc.set_stroke_color((0.0, 0.0, 0.0, 1.0))
-        r = 15
-        b = 30
+        self.w, self.h = w, h = gc.width(), gc.height()
+        gc.set_stroke_color((37/255., 51/255., 112/255., 1))
+        gc.set_line_width(4.0)
+        self.r = r = 15
+        self.b = b = 30
         s = h / 13
-        left_circle_pos = np.linspace(s, h - s, N_INPUTS)
-        right_circle_pos = left_circle_pos[:N_OUTPUTS]
-        for y_coord in left_circle_pos:
+        self.left_circle_pos = lcp = np.linspace(s, h - s, N_INPUTS)
+        self.right_circle_pos = rcp = lcp[:N_OUTPUTS]
+        for y_coord in lcp:
             gc.arc(b, y_coord, r, 0, 360)
-        for y_coord in right_circle_pos:
+        for y_coord in rcp:
             gc.arc(w - b, y_coord, r, 0, 360)
+        gc.stroke_path()
 
     def _draw_lines(self, gc):
         w, h = gc.width(), gc.height()
-        gc.set_line_width(2.0)
-        gc.set_stroke_color((0.0, 0.0, 0.0, 1.0))
+        gc.set_line_width(4.0)
+        gc.set_stroke_color((172/255., 175/255., 179/255., 1))
         for line in self.lines:
             x1, y1, x2, y2 = line
             gc.move_to(x1, y1)
             gc.line_to(x2, y2)
+        gc.stroke_path()
 
     def normal_key_pressed(self, event):
         print "key pressed: ", event.character
 
-    def normal_mouse_move(self, event):
-        self.lines = [(30, 30, event.x, event.y)]
+    def normal_left_down(self, event):
+        circle_y = self._get_nearest_circle(event.x, event.y)
+        if circle_y is not None:
+            self.lines.append([self.b, circle_y, event.x, event.y])
+            self.event_state = 'connecting'
+            event.handled = True
+            self.request_redraw()
+        else:
+            pass
+            # XXX Implement this
+            #clicked_line = self._get_nearest_line(self, x, y)
+            #if clicked_line:
+            #    self.lines.pop(clicked_line)
+
+    def connecting_left_down(self, event):
+        circle_y = self._get_nearest_circle(event.x, event.y)
+        if circle_y:
+            self.lines[-1][2:] = [self.w - self.b, circle_y]
+        else:
+            self.lines.pop()
+        self.event_state = 'normal'
+        event.handled = True
         self.request_redraw()
+
+    def connecting_mouse_move(self, event):
+        self.lines[-1][-2:] = [event.x, event.y]
+        event.handled = True
+        self.request_redraw()
+
+    def _get_nearest_circle(self, x, y):
+        """ Returns the nearest circle or None if there are no circles within
+            `distance` of x and y.
+
+        """
+        if self.event_state == 'normal':  # only check input circles
+            left_gutter = self.b + self.r
+            if x > left_gutter:  # border + radius
+                return None
+            for circle_y in self.left_circle_pos:
+                if circle_y - self.r < y and circle_y + self.r > y:
+                    return circle_y
+            return None
+
+        if self.event_state == 'connecting':  # only check output cirlces
+            right_gutter = self.w - (self.b + self.r)
+            if x < right_gutter:
+                return None
+            for circle_y in self.right_circle_pos:
+                if circle_y - self.r < y and circle_y + self.r > y:
+                    return circle_y
+            return None
 
 
 class IOController(HasStrictTraits):
@@ -190,7 +245,7 @@ class IOController(HasStrictTraits):
         return plot
 
     def _link_plot_default(self):
-        return Box()
+        return ConnectionsComponent()
 
     def _plot_data_default(self):
         plot_data = ArrayPlotData()
