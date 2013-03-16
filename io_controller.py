@@ -2,8 +2,8 @@ import numpy as np
 from matplotlib.pyplot import Figure
 from mpl_toolkits.mplot3d import art3d, Axes3D
 from enable.api import Component
-from traits.api import (HasStrictTraits, Int, Float, Instance, Any,
-        on_trait_change)
+from traits.api import (HasStrictTraits, Int, Float, Instance, Any, Dict,
+        on_trait_change, Set, List, Event)
 from chaco.api import Plot, ArrayPlotData
 
 from links_component import LinksComponent
@@ -34,16 +34,20 @@ LOGO_RIGHT = np.array([[1, 0, 0],
                 ])
 
 
-ACC_MAX = 1024
-ACC_MIN = 0
+# Map of input names and the amount needed to normalize them
+INPUT_MAP = [('potentiometer', 1024.0),
+            ('distance', 100.0),
+            ('switch', 1),
+            ('acc_z', 1024.0),
+            ('acc_y', 1024.0),
+            ('acc_x', 1024.0)]
 
-INPUT_MAP = ['x', 'y', 'z', 'comp', 'dist', 'pot']
-OUTPUT_MAP = ['led', 'servo', 'motor']
+OUTPUT_MAP = ['motor', 'servo', 'led']
 
 
 class IOController(HasStrictTraits):
 
-    ### Sensors  ##############################################################
+    ### Current Sensor Values  ################################################
 
     acc_x = Int(plot_data=True)
 
@@ -51,7 +55,7 @@ class IOController(HasStrictTraits):
 
     acc_z = Int(plot_data=True)
 
-    compass_heading = Float(plot_data=True)
+    switch = Float(plot_data=True)
 
     distance = Float(plot_data=True)
 
@@ -67,7 +71,7 @@ class IOController(HasStrictTraits):
 
     acc_z_plot = Instance(Plot)
 
-    compass_plot = Instance(Plot)
+    switch_plot = Instance(Plot)
 
     distance_plot = Instance(Plot)
 
@@ -86,6 +90,20 @@ class IOController(HasStrictTraits):
     servo_value = Int(output=True)
 
     motor_value = Int(output=True)
+
+    ### IOController Interface  ###############################################
+
+    added_links = List()
+
+    removed_links = List()
+
+    outputs = Dict()
+
+    rotate_logo = Event()
+
+    ### Private Traits  #######################################################
+
+    _current_links = Set()
 
     ### Trait Defaults  #######################################################
 
@@ -125,9 +143,9 @@ class IOController(HasStrictTraits):
         plot.padding = (0, 0, 0, 0)
         return plot
 
-    def _compass_plot_default(self):
+    def _switch_plot_default(self):
         plot = Plot(self.plot_data)
-        plot.plot(('compass_heading',))
+        plot.plot(('switch',))
         plot.padding = (0, 0, 0, 0)
         return plot
 
@@ -148,10 +166,9 @@ class IOController(HasStrictTraits):
 
     def _plot_data_default(self):
         plot_data = ArrayPlotData()
-        plot_data.set_data('compass_heading', np.zeros(50))
         plot_data.set_data('distance', np.zeros(50))
         plot_data.set_data('potentiometer', np.zeros(50))
-        plot_data.set_data('compass_heading', np.zeros(50))
+        plot_data.set_data('switch', np.zeros(50))
         plot_data.set_data('acc_x', np.zeros(50))
         plot_data.set_data('acc_y', np.zeros(50))
         plot_data.set_data('acc_z', np.zeros(50))
@@ -172,8 +189,24 @@ class IOController(HasStrictTraits):
             ary = ary[-50:]
             self.plot_data.set_data(name, ary)
 
-    @on_trait_change('acc_x, acc_y, acc_z')
-    def _update_logo_plot(self):
+    @on_trait_change('+output')
+    def _push_to_server(self, name, new):
+        self.outputs[name] = new
+        print self.outputs
+
+    #@on_trait_change('acc_x, acc_y, acc_z')
+    #def _update_logo_plot(self):
+    #    ax = self._logo_ax
+    #    if ax and ax.figure.canvas:
+    #        xyz = - (np.array([self.acc_x, self.acc_y, self.acc_z]) / -800.0) - .5
+    #        print xyz, np.array([self.acc_x, self.acc_y, self.acc_z])
+    #        elev, azim = cart_to_sph(xyz)
+    #        print 'new elev, azim:', elev, azim
+    #        ax.elev = elev * 360
+    #        ax.azim = azim * 360
+
+    @on_trait_change('rotate_logo')
+    def _rotate_logo_plot(self):
         ax = self._logo_ax
         if ax and ax.figure.canvas:
             ax.azim += 1
@@ -181,4 +214,25 @@ class IOController(HasStrictTraits):
 
     @on_trait_change('link_plot.links[]')
     def _links_changed(self, new):
-        print new
+        new = set(new)
+        old = self._current_links
+        added = new - old
+        added_links = []
+        for i, out in added:
+            added_links.append((INPUT_MAP[i], OUTPUT_MAP[out]))
+        removed = old - new
+        removed_links = []
+        for i, out in removed:
+            removed_links.append((INPUT_MAP[i], OUTPUT_MAP[out]))
+        self._current_links = new
+        self.added_links.extend(added_links)
+        self.removed_links.extend(removed_links)
+        print added, removed
+
+
+def cart_to_sph(xyz):
+    xy = xyz[0] ** 2 + xyz[1] ** 2
+    #elev = np.arctan2(np.sqrt(xy), xyz[2])  # for elevation angle defined from Z-axis down
+    elev = np.arctan2(xyz[2], np.sqrt(xy))  # for elevation angle defined from XY-plane up
+    azim = np.arctan2(xyz[1], xyz[0])
+    return elev, azim

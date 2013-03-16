@@ -25,7 +25,7 @@ enamldef SensorViewWindow(Window): win:
                         acc_x,
                         acc_y,
                         acc_z,
-                        compass_heading,
+                        switch,
                         distance,
                         potentiometer,
                         ),
@@ -55,7 +55,7 @@ enamldef SensorViewWindow(Window): win:
                 acc_x.v_center == x_plot.v_center,
                 acc_y.v_center == y_plot.v_center,
                 acc_z.v_center == z_plot.v_center,
-                compass_heading.v_center == c_plot.v_center,
+                switch.v_center == c_plot.v_center,
                 distance.v_center == d_plot.v_center,
                 potentiometer.v_center == p_plot.v_center,
 
@@ -79,7 +79,7 @@ enamldef SensorViewWindow(Window): win:
         EnableCanvas: z_plot:
             component = io_controller.acc_z_plot
         EnableCanvas: c_plot:
-            component = io_controller.compass_plot
+            component = io_controller.switch_plot
         EnableCanvas: d_plot:
             component = io_controller.distance_plot
         EnableCanvas: p_plot:
@@ -115,14 +115,14 @@ enamldef SensorViewWindow(Window): win:
             Label: lz:
                 hug_height = 'ignore'
                 text << '<b>Z</b>'
-        Container: compass_heading:
+        Container: switch:
             constraints <<[hbox(nc, spacer, lc)]
             Label: nc:
                 hug_height = 'ignore'
-                text << '{:.2f}'.format(io_controller.compass_heading)
+                text << '{:.0f}'.format(io_controller.switch)
             Label: lc:
                 hug_height = 'ignore'
-                text << '<b>Compass</b>'
+                text << '<b>Switch</b>'
         Container: distance:
             constraints <<[hbox(nd, spacer, ld)]
             Label: nd:
@@ -170,4 +170,4 @@ enamldef SensorViewWindow(Window): win:
             value := io_controller.servo_value
         Slider: motor_slider:
             hug_height = 'ignore'
-            value := io_controller.servo_value
+            value := io_controller.motor_value
