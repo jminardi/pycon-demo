@@ -10,7 +10,7 @@ from io_controller import IOController
 
 class SensorApp(object):
 
-    def __init__(self, ip='192.168.43.48', port=2015):
+    def __init__(self, ip='192.168.43.48', port=2019):
     #def __init__(self, ip='192.168.1.80', port=2015):
         self.ip = ip
         self.port = port
@@ -49,7 +49,6 @@ class SensorApp(object):
         socket.connect("tcp://{}:{}".format(self.ip, self.port))
 
         while self._run:
-            self.io_controller.rotate_logo = True
             send = {}
             if self.io_controller.added_links:
                 add = self.io_controller.added_links
