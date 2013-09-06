@@ -45,17 +45,17 @@ class ServoActuator(object):
 
 class AnalogSPISensor(object):
 
-    def __init__(self, pins):
+    def __init__(self, pins, range=(0, 1023)):
         self.pins = pins
         self.num_values = len(pins)
-        self.range = (0, 1023)
+        self.range = range
 
     def read(self):
         return [self._read_adc(pin) for pin in self.pins]
 
     def read_normalized(self):
         min, max = self.range
-        return [val / float(max) for val in self.read()]
+        return [(val - min) / float(max) for val in self.read()]
 
     def _read_adc(self, adcnum):
         """ read SPI data from MCP3008 chip, 8 possible adc's (0 thru 7).  """
@@ -72,7 +72,7 @@ class PingSensor(object):
     def __init__(self, trigger, echo):
         self.trigger = trigger
         self.echo = echo
-        self.range = (0, 100)
+        s(elf.range = (0, 100)
         self.num_values = 1
 
         io.setup(trigger, io.OUT)
@@ -112,10 +112,11 @@ class PingSensor(object):
         if distance > 100:
             distance = 100
 
-        return distance
+        return distance,
 
     def read_normalized(self):
-        return self.read() / float(self.range[1])
+        value = self.read()[0] / float(self.range[1])
+        return value,
 
 
 class SensorServer(object):
@@ -135,7 +136,7 @@ class SensorServer(object):
         """ Initialize and start threads. """
 
         # Sensors
-        self.acc = AnalogSPISensor([0, 1, 2])
+        self.acc = AnalogSPISensor([0, 1, 2], range=(100, 800))
         self.pot = AnalogSPISensor([3])
         self.switch = AnalogSPISensor([4])
         self.ping = PingSensor(25, 24)
@@ -178,7 +179,8 @@ class SensorServer(object):
             time.sleep(.1)
             #  Wait for next request from client
             message = socket.recv()
-            print "Received request: ", message
+            if message:
+                print "Received request: ", message
 
             request = json.loads(message)
             self._handle_request(request)
@@ -205,7 +207,7 @@ class SensorServer(object):
     def _link_worker(self):
         while self._run:
             for in_, out in self.links:
-                actuator = self.actuator[out]
+                actuator = self.actuators[out]
                 sensor_value = self.sensor_data[in_[0]]
                 actuator.set_normalized(sensor_value)
             time.sleep(0.1)
