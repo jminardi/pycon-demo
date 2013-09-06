@@ -72,7 +72,7 @@ class PingSensor(object):
     def __init__(self, trigger, echo):
         self.trigger = trigger
         self.echo = echo
-        s(elf.range = (0, 100)
+        self.range = (0, 100)
         self.num_values = 1
 
         io.setup(trigger, io.OUT)
@@ -179,7 +179,7 @@ class SensorServer(object):
             time.sleep(.1)
             #  Wait for next request from client
             message = socket.recv()
-            if message:
+            if len(message) > 2:
                 print "Received request: ", message
 
             request = json.loads(message)
