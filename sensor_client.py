@@ -10,7 +10,8 @@ from io_controller import IOController
 
 class SensorApp(object):
 
-    def __init__(self, ip='192.168.43.186', port=2021):
+    def __init__(self, ip='192.168.43.48', port=2015):
+    #def __init__(self, ip='192.168.1.80', port=2015):
         self.ip = ip
         self.port = port
 

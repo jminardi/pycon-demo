@@ -1,37 +1,12 @@
 import numpy as np
 from matplotlib.pyplot import Figure
-from mpl_toolkits.mplot3d import art3d, Axes3D
+from mpl_toolkits.mplot3d import Axes3D
 from enable.api import Component
 from traits.api import (HasStrictTraits, Int, Float, Instance, Any, Dict,
-        on_trait_change, Set, List, Event)
+                        on_trait_change, Set, List)
 from chaco.api import Plot, ArrayPlotData
 
 from links_component import LinksComponent
-
-
-LOGO_TOP = np.array([[0, 0, 1],
-                [0, 1, 1],
-                [1, 1, 1],
-                [1, 0, 1],
-                [.75, 0, 1],
-                [.75, .75, 1],
-                [.25, .75, 1],
-                [.25, 0, 1],
-                ])
-
-LOGO_LEFT = np.array([[0, 0, 1],
-                      [0, 0, 0],
-                      [1, 0, 0],
-                      [1, 0, .25],
-                      [.25, 0, .25],
-                      [.25, 0, 1],
-                ])
-
-LOGO_RIGHT = np.array([[1, 0, 0],
-                      [1, 1, 0],
-                      [1, 1, .25],
-                      [1, 0, .25],
-                ])
 
 
 # Map of input names and the amount needed to normalize them
@@ -81,15 +56,16 @@ class IOController(HasStrictTraits):
 
     plot_data = Instance(ArrayPlotData)
 
-    _logo_ax = Any()
+    line = Any()
+    ax = Any()
 
     ### Outputs  ##############################################################
 
-    led_value = Int(output=True)
+    led = Int(output=True)
 
-    servo_value = Int(output=True)
+    servo = Int(output=True)
 
-    motor_value = Int(output=True)
+    motor = Int(output=True)
 
     ### IOController Interface  ###############################################
 
@@ -99,8 +75,6 @@ class IOController(HasStrictTraits):
 
     outputs = Dict()
 
-    rotate_logo = Event()
-
     ### Private Traits  #######################################################
 
     _current_links = Set()
@@ -109,20 +83,13 @@ class IOController(HasStrictTraits):
 
     def _logo_plot_default(self):
         fig = Figure()
-        self._logo_ax = ax = Axes3D(fig)
-        ax.set_axis_off()
-        top = art3d.Poly3DCollection([LOGO_TOP])
-        top.set_color('#253370')
-        top.set_edgecolor('#253370')
-        left = art3d.Poly3DCollection([LOGO_LEFT])
-        left.set_color('#acafb3')
-        left.set_edgecolor('#acafb3')
-        right = art3d.Poly3DCollection([LOGO_RIGHT])
-        right.set_color('#253370')
-        right.set_edgecolor('#253370')
-        ax.add_collection3d(top)
-        ax.add_collection3d(left)
-        ax.add_collection3d(right)
+        ax = Axes3D(fig)
+        line, = ax.plot((1, 2), (1, 2), (1, 2))
+        self.line = line
+        self.ax = ax
+        self.ax.set_xlim(0, 2, auto=False)
+        self.ax.set_ylim(0, 2, auto=False)
+        self.ax.set_zlim(0, 2, auto=False)
         return fig
 
     def _acc_x_plot_default(self):
@@ -180,6 +147,23 @@ class IOController(HasStrictTraits):
 
     ### Trait Change Handlers  ################################################
 
+    #@on_trait_change('acc_x, acc_y, acc_z')
+    #def _update_3d_plot(self):
+    #    if self.line and self.ax and self.ax.figure.canvas:
+    #        x, y, z = self.acc_x, self.acc_y, self.acc_z
+    #        #self.line.set_data(np.array([[0, 0, 0], [x, y, z]]).T)
+    #        data = np.array([[0, 0, 0], [x, y, z]]).T
+    #        self.line.set_data(data[0:2, :])
+    #        self.line.set_3d_properties(data[2,:])
+    #        self.ax.figure.canvas.draw()
+    #        #print x, y, z
+    #        #self.ax.clear()
+    #        #self.ax.plot((0, x), (0, y), (0, z))
+    #        #self.ax.set_xlim(0, 1, auto=False)
+    #        #self.ax.set_ylim(0, 1, auto=False)
+    #        #self.ax.set_zlim(0, 1, auto=False)
+    #        #self.ax.figure.canvas.draw()
+
     @on_trait_change('+plot_data')
     def _push_to_plot_data(self, name, new):
         # XXX This is causing NSConcreteMapTable to leak
@@ -193,24 +177,6 @@ class IOController(HasStrictTraits):
     def _push_to_server(self, name, new):
         self.outputs[name] = new
         print self.outputs
-
-    #@on_trait_change('acc_x, acc_y, acc_z')
-    #def _update_logo_plot(self):
-    #    ax = self._logo_ax
-    #    if ax and ax.figure.canvas:
-    #        xyz = - (np.array([self.acc_x, self.acc_y, self.acc_z]) / -800.0) - .5
-    #        print xyz, np.array([self.acc_x, self.acc_y, self.acc_z])
-    #        elev, azim = cart_to_sph(xyz)
-    #        print 'new elev, azim:', elev, azim
-    #        ax.elev = elev * 360
-    #        ax.azim = azim * 360
-
-    @on_trait_change('rotate_logo')
-    def _rotate_logo_plot(self):
-        ax = self._logo_ax
-        if ax and ax.figure.canvas:
-            ax.azim += 1
-            ax.figure.canvas.draw()
 
     @on_trait_change('link_plot.links[]')
     def _links_changed(self, new):
@@ -228,11 +194,3 @@ class IOController(HasStrictTraits):
         self.added_links.extend(added_links)
         self.removed_links.extend(removed_links)
         print added, removed
-
-
-def cart_to_sph(xyz):
-    xy = xyz[0] ** 2 + xyz[1] ** 2
-    #elev = np.arctan2(np.sqrt(xy), xyz[2])  # for elevation angle defined from Z-axis down
-    elev = np.arctan2(xyz[2], np.sqrt(xy))  # for elevation angle defined from XY-plane up
-    azim = np.arctan2(xyz[1], xyz[0])
-    return elev, azim

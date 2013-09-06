@@ -64,8 +64,8 @@ enamldef SensorViewWindow(Window): win:
                 motor_slider.height == x_plot.height,
                 links.width == 200,
 
-                logo.width == 450,
-                logo.height == 450,
+                logo.width == 350,
+                logo.height == 350,
                 led.width == servo.width,
                 led.width == motor.width,
             ]
@@ -164,10 +164,10 @@ enamldef SensorViewWindow(Window): win:
 
         Slider: led_slider:
             hug_height = 'ignore'
-            value := io_controller.led_value
+            value := io_controller.led
         Slider: servo_slider:
             hug_height = 'ignore'
-            value := io_controller.servo_value
+            value := io_controller.servo
         Slider: motor_slider:
             hug_height = 'ignore'
-            value := io_controller.motor_value
+            value := io_controller.motor
