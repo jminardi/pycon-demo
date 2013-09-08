@@ -2,121 +2,10 @@ import time
 import json
 import threading
 
-import spidev
 import zmq
-import RPi.GPIO as io
 
-from robot_brain.pin import Pin
-from robot_brain.servo import Servo
-
-io.setmode(io.BCM)
-
-spi = spidev.SpiDev()
-spi.open(0, 0)
-
-
-class PWMActuator(object):
-
-    def __init__(self, pin_number):
-        self._pin = Pin(pin_number)
-        self.range = (0, 1)
-        self.num_values = 1
-
-    def set(self, val):
-        self._pin.output(val)
-
-    def set_normalized(self, val):
-        self.set(val)
-
-
-class ServoActuator(object):
-
-    def __init__(self, pin_number):
-        self._servo = Servo(pin_number)
-        self.range = (0, 1)
-        self.num_values = 1
-
-    def set(self, val):
-        self._servo.set(val)
-
-    def set_normalized(self, val):
-        self.set(val)
-
-
-class AnalogSPISensor(object):
-
-    def __init__(self, pins, range=(0, 1023)):
-        self.pins = pins
-        self.num_values = len(pins)
-        self.range = range
-
-    def read(self):
-        return [self._read_adc(pin) for pin in self.pins]
-
-    def read_normalized(self):
-        min, max = self.range
-        return [(val - min) / float(max) for val in self.read()]
-
-    def _read_adc(self, adcnum):
-        """ read SPI data from MCP3008 chip, 8 possible adc's (0 thru 7).  """
-
-        if ((adcnum > 7) or (adcnum < 0)):
-            return -1
-        r = spi.xfer2([1, (8 + adcnum) << 4, 0])
-        adcout = ((r[1] & 3) << 8) + r[2]
-        return adcout
-
-
-class PingSensor(object):
-
-    def __init__(self, trigger, echo):
-        self.trigger = trigger
-        self.echo = echo
-        self.range = (0, 100)
-        self.num_values = 1
-
-        io.setup(trigger, io.OUT)
-        io.setup(echo, io.IN)
-
-    def read(self):
-        # Send 10us pulse to trigger
-        io.output(self.trigger, True)
-        time.sleep(0.00001)
-        io.output(self.trigger, False)
-
-        start = time.time()
-        while io.input(self.echo) == 0:
-            # Wait for echo to go high
-            stop = time.time()
-            if (stop - start) > .1:
-                break
-
-        start = time.time()
-        while io.input(self.echo) == 1:
-            # wait for echo to go low
-            stop = time.time()
-            if (stop - start) > .1:
-                break
-
-        # Calculate pulse length
-        elapsed = stop - start
-
-        # Distance pulse travelled in that time is time
-        # multiplied by the speed of sound (cm/s)
-        distance = elapsed * 34300
-
-        # That was the distance there and back so halve the value
-        distance = distance / 2
-
-        # Cap value at 100
-        if distance > 100:
-            distance = 100
-
-        return distance,
-
-    def read_normalized(self):
-        value = self.read()[0] / float(self.range[1])
-        return value,
+from robot_brain.sensors import MCP3007AnalogSensor, PingSensor
+from robot_brain.actuators import PWMActuator, ServoActuator
 
 
 class SensorServer(object):
@@ -136,9 +25,9 @@ class SensorServer(object):
         """ Initialize and start threads. """
 
         # Sensors
-        self.acc = AnalogSPISensor([0, 1, 2], range=(100, 800))
-        self.pot = AnalogSPISensor([3])
-        self.switch = AnalogSPISensor([4])
+        self.acc = MCP3007AnalogSensor([0, 1, 2], range=(100, 800))
+        self.pot = MCP3007AnalogSensor([3])
+        self.switch = MCP3007AnalogSensor([4])
         self.ping = PingSensor(25, 24)
 
         # Actuators
